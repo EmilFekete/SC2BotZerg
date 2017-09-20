@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <algorithm>
 
 using namespace sc2;
 using namespace std;
@@ -10,7 +11,8 @@ using namespace std;
 class Bot : public Agent {
 public:
 	virtual void OnGameStart() final {
-
+		hatchingOverlords = 1;
+		cout << "overlord count: " << hatchingOverlords << endl;
 	}
 
 	virtual void OnStep() final {
@@ -28,30 +30,35 @@ public:
 		}
 		Debug()->SendDebug();
 
-		if (isOverlordNeeded() && larvas.size() > 0 && isResourcesAvailable(100)) {
-			cout << "Training Overlord" << endl;
-			Actions()->UnitCommand(larvas.back(), ABILITY_ID::TRAIN_OVERLORD);
-			larvas.pop_back();
+		// if we morphed an egg, remove it from the larvas
+		Units eggs = Observation()->GetUnits(Unit::Alliance::Self, [](const Unit& u) {return u.unit_type.ToType() == UNIT_TYPEID::ZERG_EGG; });
+		for (const auto &egg : eggs) {
+			larvas.erase(std::remove(larvas.begin(), larvas.end(), egg.tag), larvas.end());
 		}
-		else if (larvas.size() > 0 && isResourcesAvailable(50) && !isOverlordNeeded()) {
-			Actions()->UnitCommand(larvas.back(), ABILITY_ID::TRAIN_DRONE);
-			larvas.pop_back();
-			cout << "Training drone, larvas size: " << larvas.size() << endl;
 
+		if (isOverlordNeeded() && larvas.size() > 0 && isResourcesAvailable(100)) {
+			hatchingOverlords++;
+			cout << "hatching overlords" << endl;
+			Actions()->UnitCommand(larvas.back(), ABILITY_ID::TRAIN_OVERLORD);
+		} else if (larvas.size() > 0 && isResourcesAvailable(50) && drones.size() < desiredDroneCount) {
+			Actions()->UnitCommand(larvas.back(), ABILITY_ID::TRAIN_DRONE);
 		}
 	}
+
 	virtual void OnUnitCreated(const Unit& unit) final {
 		auto myUnitsType = unit.unit_type.ToType();
 		if (myUnitsType == UNIT_TYPEID::ZERG_LARVA) {
-			cout << "larva created and added" << endl;
 			larvas.push_back(*(Observation()->GetUnit(unit.tag)));
 		}
 		else if (myUnitsType == UNIT_TYPEID::ZERG_DRONE) {
 			drones.push_back(*(Observation()->GetUnit(unit.tag)));
+		} else if (myUnitsType == UNIT_TYPEID::ZERG_OVERLORD) {
+			hatchingOverlords--;
 		}
 	}
 
 private:
+	const size_t desiredDroneCount = 21;
 	const Unit* getUnitWithTag(Tag unitTag) {
 		return Observation()->GetUnit(unitTag);
 	}
@@ -61,11 +68,15 @@ private:
 		bool result = (mineralsCurrent - mineralsNeeded) >= 0 && (gasCurrent - gasNeeded) >= 0;
 		return result;
 	}
+
 	bool isOverlordNeeded() const {
-		return Observation()->GetFoodCap() <= Observation()->GetFoodUsed();
+		cout << (Observation()->GetFoodCap() <= Observation()->GetFoodUsed() && hatchingOverlords < 1) << endl;
+		return (Observation()->GetFoodCap() <= Observation()->GetFoodUsed() && hatchingOverlords < 1);
 	}
+
 	vector<Tag> larvas;
 	vector<Tag> drones;
+	size_t hatchingOverlords;
 };
 
 int main(int argc, char* argv[]) {
