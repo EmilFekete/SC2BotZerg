@@ -129,6 +129,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MapTools.cpp" />
+    <ClCompile Include="ZergBot.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="MapTools.h" />
+    <ClInclude Include="ZergBot.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
